@@ -17,6 +17,33 @@ It is a minimal local agent loop with:
 
 The model backend is currently based on Ollama.
 
+## Skill-Centric Prototype
+
+This fork also includes a second runtime that evolves the original harness into a skill-centric agent system.
+
+- entrypoint: `app.py`
+- router: `router/`
+- skills: `skills/`
+- executor: `executor/`
+- trace: `trace/`
+- design notes: `DESIGN.md`
+- evaluation checklist: `EVALUATION.md`
+
+Example commands:
+
+```bash
+python app.py run --task "比较 pytest vs unittest，并给出推荐理由"
+python app.py trace --task "分析 README.md 和 issue.md，然后给我一个方案"
+python app.py schemas --json
+```
+
+To enable real LLM-backed skills with Kimi / Moonshot:
+
+```bash
+export MOONSHOT_API_KEY=your_key
+python app.py --provider moonshot --model kimi-k2.5 trace --task "分析 README.md 和 issue.md，然后给我一个方案，必须包含 Analysis 和 Testing 两节"
+```
+
 <a href="https://magazine.sebastianraschka.com/p/components-of-a-coding-agent">
   <img src="https://substack-post-media.s3.amazonaws.com/public/images/49b97718-57f4-4977-99c8-8ad5c4d32af3_1548x862.png" width="500px">
 </a>

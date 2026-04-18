@@ -30,6 +30,8 @@ htmlcov/
 
 # Local scratch space
 tmp/
+.beads/
+.runtime/
 
 # OS files
 .DS_Store
