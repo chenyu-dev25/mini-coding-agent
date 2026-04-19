@@ -1,0 +1,6 @@
+{
+  "task": "分析 README.md 和 issue.md，然后给我一个方案，必须包含 Analysis 和 Testing 两节。",
+  "context": {
+    "must_include": ["analysis", "testing"]
+  }
+}

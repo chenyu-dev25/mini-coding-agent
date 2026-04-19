@@ -3,8 +3,81 @@ import json
 from executor import SkillAgent
 from models import FakeChatModelClient
 from skills import build_default_registry
-from skills.base import BaseSkill
-from models.schemas import SkillDefinition, SkillInput, SkillOutput
+from skills.base import parse_skill_document
+from router import is_skill_catalog_query
+
+
+def test_skill_catalog_query_matches_nfkc_fullwidth_skill():
+    assert is_skill_catalog_query("你有哪些\uff53\uff4b\uff49\uff4c\uff4c")  # fullwidth "skill"
+
+
+def test_skill_catalog_query_uses_llm_not_skill_pipeline(tmp_path):
+    client = FakeChatModelClient(
+        ["当前内置 skill 包括 planning、analysis 等，可按需选用。"],
+    )
+    agent = SkillAgent(tmp_path, model_client=client)
+
+    trace = agent.run("你有哪些skill")
+
+    assert trace.task_type.value == "skill_catalog"
+    assert trace.skill_executions == []
+    assert len(client.prompts) == 1
+    user_blob = client.prompts[0][1]["content"]
+    assert "planning" in user_blob
+    assert "你有哪些skill" in user_blob
+
+
+def test_greeting_is_chitchat_uses_llm_not_planning(tmp_path):
+    client = FakeChatModelClient(["你好！需要的话可以直接说想做的任务。"])
+    agent = SkillAgent(tmp_path, model_client=client)
+    trace = agent.run("你好")
+    assert trace.task_type.value == "chitchat"
+    assert trace.skill_executions == []
+    assert trace.final_result == "你好！需要的话可以直接说想做的任务。"
+    assert len(client.prompts) == 1
+
+
+def test_on_progress_callback_for_chitchat(tmp_path):
+    client = FakeChatModelClient(["ok"])
+    agent = SkillAgent(tmp_path, model_client=client)
+    msgs: list[str] = []
+    trace = agent.run("你好", on_progress=msgs.append)
+    assert trace.task_type.value == "chitchat"
+    assert len(msgs) >= 2
+    assert any("寒暄" in m for m in msgs)
+    assert any("完成" in m for m in msgs)
+
+
+def test_generic_question_uses_direct_mode_without_router(tmp_path):
+    agent = SkillAgent(tmp_path, model_client=None)
+    trace = agent.run("用一句话解释什么是递归")
+    assert trace.task_type.value == "direct"
+    assert not trace.router_decisions
+    assert not trace.skill_executions
+    assert "LLM" in trace.final_result or "模型" in trace.final_result
+
+
+def test_direct_mode_calls_llm_when_client_configured(tmp_path):
+    client = FakeChatModelClient(["递归是函数调用自身。"])
+    agent = SkillAgent(tmp_path, model_client=client)
+    trace = agent.run("用一句话解释什么是递归")
+    assert trace.task_type.value == "direct"
+    assert trace.final_result == "递归是函数调用自身。"
+    assert len(client.prompts) == 1
+
+
+def test_skill_pipeline_flag_runs_staged_skills_without_high_intent_cues(tmp_path):
+    client = FakeChatModelClient(
+        [
+            '{"clarity_score":0.9,"requirements":{"goal":"g","constraints":[],"deliverables":[],"ambiguous_points":[]},"suggested_next_skills":[],"status":"ok"}',
+            "## Answer\nhello",
+            '{"passed":true,"checklist":[],"missing_sections":[],"summary":"ok"}',
+        ]
+    )
+    agent = SkillAgent(tmp_path, model_client=client, use_skill_pipeline=True)
+    trace = agent.run("用一行英文打个招呼")
+    assert trace.task_type.value == "generation"
+    assert [r.skill_name for r in trace.skill_executions] == ["planning", "generation", "verification"]
 
 
 def test_requirement_route_asks_back_when_task_is_too_vague(tmp_path):
@@ -44,8 +117,9 @@ def test_comparison_route_uses_comparison_generation_and_verification(tmp_path):
 
     assert trace.task_type.value == "comparison"
     assert [record.skill_name for record in trace.skill_executions] == ["comparison", "generation", "verification"]
+    assert "## Comparison" in trace.final_result
     assert "## Recommendation" in trace.final_result
-    assert "Reason:" in trace.final_result
+    assert "推荐理由" in trace.final_result or "Reason:" in trace.final_result
 
 
 def test_verification_failure_triggers_regeneration_once(tmp_path):
@@ -69,28 +143,34 @@ def test_verification_failure_triggers_regeneration_once(tmp_path):
 
 
 def test_skill_registry_allows_adding_a_new_skill_without_executor_changes(tmp_path):
-    class DummySkill(BaseSkill):
-        name = "dummy"
-        description = "dummy"
+    skill_dir = tmp_path / "dummy_skill"
+    skill_dir.mkdir()
+    (skill_dir / "SKILL.md").write_text(
+        """# Dummy
 
-        @classmethod
-        def build_definition(cls) -> SkillDefinition:
-            return SkillDefinition(
-                name="dummy",
-                purpose="dummy",
-                inputs={"task": "task"},
-                outputs={"result": "result"},
-                applicable_when=["for tests"],
-                not_applicable_when=["never"],
-                dependencies=[],
-                failure_strategy="none",
-            )
+- name: dummy
+- description: dummy
+- failure_strategy: none
+- applicable_when:
+- for tests
+- not_applicable_when:
+- never
+- dependencies:
 
-        def execute(self, input_data: SkillInput) -> SkillOutput:
-            return SkillOutput(success=True, result="dummy")
+## Inputs
+- task: task
+
+## Outputs
+- result: result
+
+## Content
+This is a dummy directory skill used by tests.
+""",
+        encoding="utf-8",
+    )
 
     registry = build_default_registry()
-    registry.register(DummySkill)
+    registry.register_document(parse_skill_document(skill_dir / "SKILL.md"))
 
     agent = SkillAgent(tmp_path, registry=registry)
     definitions = agent.registry.definitions()

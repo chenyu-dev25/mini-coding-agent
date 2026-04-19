@@ -30,8 +30,16 @@ htmlcov/
 
 # Local scratch space
 tmp/
-.beads/
 .runtime/
+
+# Secrets and local env
+.env
+.env.*
 
 # OS files
 .DS_Store
+
+# Beads / Dolt files (added by bd init)
+.dolt/
+*.db
+.beads-credential-key

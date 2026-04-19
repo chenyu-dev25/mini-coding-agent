@@ -1,38 +1,22 @@
-"""Skill registry helpers and built-in skills."""
+"""Directory-style skill registry helpers."""
 
-from skills.analysis_skill import AnalysisSkill
-from skills.ask_back_skill import AskBackSkill
-from skills.base import BaseSkill, SkillRegistry, ToolExecutorMixin
-from skills.comparison_skill import ComparisonSkill
-from skills.generation_skill import GenerationSkill
-from skills.planning_skill import PlanningSkill
-from skills.verification_skill import VerificationSkill
+from __future__ import annotations
+
+from pathlib import Path
+
+from skills.base import BaseSkill, SkillDocument, SkillRegistry, load_directory_skills, parse_skill_document
 
 
 def build_default_registry() -> SkillRegistry:
-    """Register the built-in skill set."""
-    registry = SkillRegistry()
-    for skill_cls in [
-        PlanningSkill,
-        AnalysisSkill,
-        ComparisonSkill,
-        GenerationSkill,
-        VerificationSkill,
-        AskBackSkill,
-    ]:
-        registry.register(skill_cls)
-    return registry
+    """Register the built-in directory skills under skills/*/SKILL.md."""
+    return load_directory_skills(Path(__file__).resolve().parent)
 
 
 __all__ = [
-    "AnalysisSkill",
-    "AskBackSkill",
     "BaseSkill",
-    "ComparisonSkill",
-    "GenerationSkill",
-    "PlanningSkill",
+    "SkillDocument",
     "SkillRegistry",
-    "ToolExecutorMixin",
-    "VerificationSkill",
     "build_default_registry",
+    "load_directory_skills",
+    "parse_skill_document",
 ]

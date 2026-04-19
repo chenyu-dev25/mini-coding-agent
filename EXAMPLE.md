@@ -131,10 +131,11 @@ You should now have:
 &nbsp;
 ## 8. Useful interactive commands
 
-While the agent is running, these commands are available:
+While `uv run mini-coding-agent` is running, these commands are available:
 
-- `/help` shows the available slash commands and what each one does.
-- `/memory` prints the agent's distilled working memory for the current session.
-- `/session` shows the path to the saved session JSON file on disk.
-- `/reset` clears the current conversation history and working memory.
-- `/exit` leaves the interactive agent.
+- `/skills` shows the slash-command help text.
+- `/list-skills` asks the model to list registered skills.
+- `/pipeline` / `/direct` toggle multi-skill routing for the current session.
+- `/exit` or `quit` leaves the interactive agent.
+
+If you run `mini_coding_agent.py` directly, you also get `/memory`, `/session`, and `/reset` for its session store.

@@ -2,10 +2,98 @@
 
 from __future__ import annotations
 
+import os
+import re
+import unicodedata
 from typing import Dict, List
 
 from models.schemas import RoutedSkill, RouterDecision, SkillInput, TaskClassification, TaskType
 from skills.base import SkillRegistry
+
+
+def is_skill_catalog_query(text: str) -> bool:
+    """True when the user only wants to know which skills exist (no pipeline)."""
+    raw = unicodedata.normalize("NFKC", (text or "").strip())
+    if not raw:
+        return False
+    low = raw.lower()
+
+    if any(k in raw for k in ("哪些技能", "什么技能", "列出技能", "技能列表", "可用技能", "支持哪些技能")):
+        return True
+    if "技能" in raw and any(w in raw for w in ("哪些", "什么", "列出", "有什么", "有啥", "会什么")):
+        return True
+    if "skill" in low and any(w in raw for w in ("哪些", "什么", "列出", "有什么", "有啥")):
+        return True
+    if any(e in low for e in ("what skills", "list skills", "available skills", "which skills", "show skills")):
+        return True
+    return False
+
+
+def is_pure_greeting(text: str) -> bool:
+    """True for short greetings / thanks only — not a task for planning."""
+    raw = unicodedata.normalize("NFKC", (text or "").strip())
+    if not raw or len(raw) > 48:
+        return False
+    stripped = re.sub(r"[，。！？!?,、.~～…]+$", "", raw.strip())
+    if not stripped:
+        return False
+    low = stripped.lower()
+    if re.match(
+        r"^(你好|您好|嗨|哈喽|哈喽|hello|hi|hey|早上好|下午好|晚上好|在吗|在么)([啦呀啊呢哇哦噢\u3000\s!！.,，?？]*)$",
+        stripped,
+        re.IGNORECASE,
+    ):
+        return True
+    if low in {"hello", "hi", "hey", "yo", "hiya", "ok", "okay", "thanks", "thx", "ty"}:
+        return True
+    if stripped in {"嗯", "嗯嗯", "好", "好的", "明白", "收到", "谢谢", "多谢", "感恩"}:
+        return True
+    if stripped.startswith("谢谢") and len(stripped) <= 6:
+        return True
+    return False
+
+
+def high_intent_skill_route(text: str) -> bool:
+    """Strong cues that match the multi-skill router buckets (not generic chat)."""
+    raw = unicodedata.normalize("NFKC", (text or "").strip())
+    if not raw:
+        return False
+    task = raw.lower()
+
+    if any(word in task for word in ["比较", "对比", " vs ", "which", "better"]):
+        return True
+    if any(word in raw for word in ["需求", "整理", "规划", "计划", "怎么做"]) or any(
+        word in raw for word in ["差不多", "随便", "大概"]
+    ):
+        return True
+    if "clarify" in task:
+        return True
+    if any(word in task for word in ["分析", "inspect", "review", "readme", ".py", ".md", "文件"]):
+        return True
+    return False
+
+
+def wants_skill_pipeline(task: str, context: dict, *, agent_default: bool = False) -> bool:
+    """Multi-skill router runs only when opted in or the task clearly needs structured skills."""
+
+    if context.get("use_skill_pipeline") is True:
+        return True
+    if context.get("use_skill_pipeline") is False:
+        return False
+
+    if context.get("must_include"):
+        return True
+
+    if agent_default:
+        return True
+
+    env = os.environ.get("SKILL_AGENT_PIPELINE", "").strip().lower()
+    if env in ("1", "true", "yes", "on", "always"):
+        return True
+    if env in ("0", "false", "no", "off", "never"):
+        return False
+
+    return high_intent_skill_route(task)
 
 
 class SkillRouter:
@@ -15,6 +103,7 @@ class SkillRouter:
         self.registry = registry
 
     def classify(self, task_input: SkillInput) -> TaskClassification:
+        """Classify only when the multi-skill pipeline is already enabled (see ``wants_skill_pipeline``)."""
         task = task_input.task.lower()
         reasons: List[str] = []
 
@@ -27,15 +116,6 @@ class SkillRouter:
                 reasoning=" ".join(reasons),
             )
 
-        if any(word in task for word in ["分析", "inspect", "review", "readme", ".py", ".md", "文件"]):
-            reasons.append("The task references artifacts or asks for analysis before answering.")
-            return TaskClassification(
-                task_type=TaskType.ANALYSIS,
-                confidence=0.87,
-                suggested_skills=["analysis", "generation", "verification"],
-                reasoning=" ".join(reasons),
-            )
-
         if any(word in task for word in ["需求", "整理", "规划", "计划", "怎么做", "clarify"]) or any(
             word in task for word in ["差不多", "随便", "大概"]
         ):
@@ -44,6 +124,15 @@ class SkillRouter:
                 task_type=TaskType.REQUIREMENT,
                 confidence=0.84,
                 suggested_skills=["planning"],
+                reasoning=" ".join(reasons),
+            )
+
+        if any(word in task for word in ["分析", "inspect", "review", "readme", ".py", ".md", "文件"]):
+            reasons.append("The task references artifacts or asks for analysis before answering.")
+            return TaskClassification(
+                task_type=TaskType.ANALYSIS,
+                confidence=0.87,
+                suggested_skills=["analysis", "generation", "verification"],
                 reasoning=" ".join(reasons),
             )
 

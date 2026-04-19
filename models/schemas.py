@@ -15,6 +15,9 @@ class TaskType(str, Enum):
     ANALYSIS = "analysis"
     GENERATION = "generation"
     COMPARISON = "comparison"
+    SKILL_CATALOG = "skill_catalog"
+    CHITCHAT = "chitchat"
+    DIRECT = "direct"
     UNKNOWN = "unknown"
 
 
@@ -62,6 +65,7 @@ class SkillDefinition(BaseModel):
 
     name: str
     purpose: str
+    content: str = ""
     inputs: Dict[str, str]
     outputs: Dict[str, str]
     applicable_when: List[str]

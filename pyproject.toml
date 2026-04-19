@@ -8,11 +8,13 @@ version = "0.1.0"
 description = "Minimal standalone coding agent backed by Ollama"
 requires-python = ">=3.10"
 dependencies = [
+    "pydantic>=2.0",
     "pytest>=9.0.2",
+    "rich>=13.7",
 ]
 
 [project.scripts]
-mini-coding-agent = "mini_coding_agent:main"
+mini-coding-agent = "app:main"
 
 [dependency-groups]
 dev = [
@@ -21,4 +23,7 @@ dev = [
 ]
 
 [tool.setuptools]
-py-modules = ["mini_coding_agent"]
+py-modules = ["mini_coding_agent", "app", "trace_renderer", "markdown_console"]
+
+[tool.setuptools.packages.find]
+include = ["executor", "models", "router", "skills", "tools", "trace"]

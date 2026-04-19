@@ -12,7 +12,7 @@ from pathlib import Path
 
 
 DOC_NAMES = ("AGENTS.md", "README.md", "pyproject.toml", "package.json")
-HELP_TEXT = "/help, /memory, /session, /reset, /exit"
+HELP_TEXT = "/skills, /memory, /session, /reset, /exit"
 WELCOME_ART = (
     "/\\     /\\\\",
     "{  `---'  }",
@@ -24,7 +24,7 @@ WELCOME_ART = (
 HELP_DETAILS = "\n".join(
     [
         "Commands:",
-        "/help    Show this help message.",
+        "/skills  Show this help message.",
         "/memory  Show the agent's distilled working memory.",
         "/session Show the path to the saved session file.",
         "/reset   Clear the current session history and memory.",
@@ -994,7 +994,7 @@ def main(argv=None):
             continue
         if user_input in {"/exit", "/quit"}:
             return 0
-        if user_input == "/help":
+        if user_input == "/skills":
             print(HELP_DETAILS)
             continue
         if user_input == "/memory":

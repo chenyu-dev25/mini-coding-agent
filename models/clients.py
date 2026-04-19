@@ -76,9 +76,69 @@ class MoonshotModelClient(ChatModelClient):
             raise RuntimeError(f"Moonshot API request failed: {exc}") from exc
 
         try:
-            return data["choices"][0]["message"]["content"]
+            msg = data["choices"][0]["message"]
         except (KeyError, IndexError, TypeError) as exc:
             raise RuntimeError(f"Unexpected Moonshot response: {data}") from exc
+        text = msg.get("content")
+        if text is None or not str(text).strip():
+            text = msg.get("reasoning_content") or msg.get("reasoning") or ""
+        return str(text) if text is not None else ""
+
+
+class OllamaChatModelClient(ChatModelClient):
+    """Minimal Ollama chat client for local skill execution."""
+
+    def __init__(
+        self,
+        model: str = "qwen3.5:4b",
+        host: str = "http://127.0.0.1:11434",
+        timeout: int = 60,
+    ):
+        self.model = model
+        self.host = host.rstrip("/")
+        self.timeout = timeout
+
+    def complete(
+        self,
+        messages: List[Dict[str, str]],
+        *,
+        max_tokens: int = 1200,
+        temperature: float = 0.2,
+    ) -> str:
+        payload: Dict[str, object] = {
+            "model": self.model,
+            "messages": messages,
+            "stream": False,
+            # Thinking models (e.g. some Qwen3) put text in `thinking` unless disabled.
+            "think": False,
+            "options": {
+                "temperature": temperature,
+                "num_predict": max_tokens,
+            },
+        }
+        request = urllib.request.Request(
+            f"{self.host}/api/chat",
+            data=json.dumps(payload).encode("utf-8"),
+            headers={"Content-Type": "application/json"},
+            method="POST",
+        )
+        try:
+            with urllib.request.urlopen(request, timeout=self.timeout) as response:
+                data = json.loads(response.read().decode("utf-8"))
+        except urllib.error.HTTPError as exc:
+            body = exc.read().decode("utf-8", errors="replace")
+            raise RuntimeError(f"Ollama API HTTP {exc.code}: {body}") from exc
+        except urllib.error.URLError as exc:
+            raise RuntimeError(f"Ollama API request failed: {exc}") from exc
+
+        try:
+            msg = data["message"]
+        except (KeyError, TypeError) as exc:
+            raise RuntimeError(f"Unexpected Ollama response: {data}") from exc
+        content = msg.get("content")
+        if content is None or not str(content).strip():
+            content = msg.get("thinking") or msg.get("reasoning") or ""
+        return str(content) if content is not None else ""
 
 
 class FakeChatModelClient(ChatModelClient):
@@ -115,6 +175,15 @@ def build_moonshot_client_from_env(
         model=model,
         base_url=os.getenv(base_url_env, "https://api.moonshot.ai/v1"),
     )
+
+
+def build_ollama_client(
+    model: str = "qwen3.5:4b",
+    host: str = "http://127.0.0.1:11434",
+    timeout: int = 60,
+) -> OllamaChatModelClient:
+    """Create a local Ollama client."""
+    return OllamaChatModelClient(model=model, host=host, timeout=timeout)
 
 
 def extract_json_object(text: str) -> Dict:

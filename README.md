@@ -1,4 +1,3 @@
-&nbsp;
 # Mini-Coding-Agent
 
 This folder contains a small standalone coding agent:
@@ -17,19 +16,19 @@ It is a minimal local agent loop with:
 
 The model backend is currently based on Ollama.
 
-## Skill-Centric Prototype
+## 面向 Skill 的多 Skill 原型
 
-This fork also includes a second runtime that evolves the original harness into a skill-centric agent system.
+这个分支除了保留原始最小 Agent 之外，还新增了一套以 Skill 为中心的运行时，用来把原本的单 Agent 框架演化成多 Skill Agent 系统。
 
-- entrypoint: `app.py`
-- router: `router/`
-- skills: `skills/`
-- executor: `executor/`
-- trace: `trace/`
-- design notes: `DESIGN.md`
-- evaluation checklist: `EVALUATION.md`
+- 入口：`app.py`
+- 路由层：`router/`
+- Skill 层：`skills/`
+- 执行层：`executor/`
+- 轨迹层：`trace/`
+- 设计说明：`DESIGN.md`
+- 验收标准：`EVALUATION.md`
 
-Example commands:
+示例命令：
 
 ```bash
 python app.py run --task "比较 pytest vs unittest，并给出推荐理由"
@@ -37,7 +36,7 @@ python app.py trace --task "分析 README.md 和 issue.md，然后给我一个�
 python app.py schemas --json
 ```
 
-To enable real LLM-backed skills with Kimi / Moonshot:
+如果要启用真实的 Kimi / Moonshot 模型能力，可以这样运行：
 
 ```bash
 export MOONSHOT_API_KEY=your_key
@@ -211,20 +210,20 @@ uv run mini-coding-agent --resume 20260401-144025-2dd0aa
 ## Interactive Commands
 
 Inside the REPL, slash commands are handled directly by the agent instead of
-being sent to the model as a normal task.
+being sent to the model as a normal task (see `app.py` / `INTERACTIVE_HELP`).
 
-- `/help`
-  shows the list of available interactive commands
-- `/memory`
-  prints the distilled session memory, including the current task, tracked files, and notes
-- `/session`
-  prints the path to the current saved session JSON file
-- `/reset`
-  clears the current session history and distilled memory but keeps you in the REPL
-- `/exit`
-  exits the interactive session
-- `/quit`
-  exits the interactive session; alias for `/exit`
+- `/exit`, `quit`
+  exit the interactive session
+- `/skills`
+  print the command list (this help)
+- `/list-skills`
+  route through the agent so the LLM lists registered skills (same intent as asking in natural language)
+- `/pipeline`
+  enable multi-skill routing for this session
+- `/direct`
+  return to default direct chat for this session (strong-intent tasks may still route)
+
+The legacy `mini_coding_agent.py` REPL still exposes `/memory`, `/session`, and `/reset` for session tooling when you run that module directly.
 
 &nbsp;
 ## Main CLI Flags
